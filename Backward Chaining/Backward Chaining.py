@@ -1,227 +1,281 @@
-from copy import deepcopy
 import sys
+from copy import deepcopy
+index = 0
+outputFile = open("output.txt","w+")
+def parseInputFile(inputFile):
+    queryList = []
+    myFile = open(inputFile, "r")
+    #Find the initial query that has to be solved and the number of clauses in KB
+    query =  stringToExpression(myFile.readline().strip('\n'))
+    numberOfClauses = myFile.readline().strip('\n')
 
-def read_file(input_file):
-    query = input_file.readline()
-    query = query[:len(query)-1]
-    number = int(input_file.readline())
-    clauses = []
-    for i in range(0, number):
-        clause = input_file.readline()
-        clause = clause[:len(clause)-1]
-        clauses.append(clause)
-
-    return query, clauses
-
-
-def find_query(query_list, claus_list, output_file, args_dict):
-    old_argument = []
-    new_argument = []
-    for query in query_list:
-        clauses_list = deepcopy(claus_list)
-        bool_val = False
-        predicate = convert_to_dict(query)
-        if predicate["function"] != "and":
-            query_print = "Ask: "
-            print_output(output_file, query_print, query)
-            flag_match = 0
-            bool_val_prev = True
-            for clause in clauses_list:
-                bool_val = False
-                if clause[len(clause)-1][:clause[len(clause)-1].find("(")] == predicate["function"]:
-                    pred_clause = convert_to_dict(clause[len(clause)-1])
-                    if len(clause) == 1:
-                        predicate_args = predicate["args"]
-                        pred_clause_args = pred_clause["args"]
-                        for i in range(0, len(predicate_args)):
-                            if predicate_args[i][0].isupper() and pred_clause_args[i][0].isupper():
-                                flag_match = 1
-                                if predicate_args[i] != pred_clause_args[i]:
-                                    flag_match = 0
-                                    bool_val = False
-                                    break
-                            elif predicate_args[i][0].islower() and pred_clause_args[i][0].isupper():
-                                old_argument.append(predicate_args[i])
-                                for bol in range(0,len(args_dict["args"])):
-                                    if args_dict["args"][bol] == predicate_args[i]:
-                                       args_dict[predicate_args[i]] = pred_clause_args[i]
-                                predicate_args[i] = pred_clause_args[i]
-                                new_argument.append(pred_clause_args[i])
-                                flag_match = 1
-                            else:
-                                flag_match = 0
-                        if flag_match == 1:
-                            bool_val = True
-                    else:
-                        if clause[len(clause)-2] == "=>":
-                            if not bool_val_prev:
-                                query_print = "Ask: "
-                                print_output(output_file, query_print , convert_to_string(predicate))
-                            temp_arg = 0
-                            for ijkl in range(0, len(predicate["args"])):
-                                if predicate["args"][ijkl][0].islower():
-                                    if pred_clause["args"][ijkl][0].isupper():
-                                        temp_arg = predicate["args"][ijkl]
-                                        temp_new_arg = pred_clause["args"][ijkl]
-                                        predicate["args"][ijkl] = pred_clause["args"][ijkl]
-                                    else:
-                                        temp_arg = predicate["args"][ijkl]
-                                        predicate["args"][ijkl] += "0"
-                                        temp_new_arg = predicate["args"][ijkl]
-
-                            for abc in range(0, len(query_list)):
-                                pred_abc = convert_to_dict(query_list[abc])
-                                if pred_abc["function"] != "and":
-                                    for intk in range(0, len(pred_abc["args"])):
-                                        if pred_abc["args"][intk] == temp_arg:
-                                            pred_abc["args"][intk] = temp_new_arg
-                                query_list[abc] = convert_to_string(pred_abc)
-
-                            temp_query = clause[:len(clause)-2]
-                            temp_query = swap_arguments(temp_query, pred_clause, predicate)
-                            for abcd in range(0, len(predicate["args"])):
-                                if pred_clause["args"][abcd][0].islower():
-                                    pred_clause["args"][abcd] = predicate["args"][abcd]
-                                    args_dict["args"].append(predicate["args"][abcd])
-                            bool_val, old_argument, new_argument, args_dict = find_query(temp_query, clauses_list, output_file, args_dict)
-                            if not bool_val :
-                                bool_val_prev = False
-
-                    if len(new_argument) != 0:
-                        for items in range(0, len(new_argument)):
-                            for item in range(0, len(predicate["args"])):
-                                if predicate["args"][item] == old_argument[items]:
-                                    predicate["args"][item] = new_argument[items]
-                            clause[len(clause)-1] = convert_to_string(predicate)
-                        for items in range(0, len(new_argument)):
-                            for quet in range(0, len(query_list)):
-                                predicator = convert_to_dict(query_list[quet])
-                                if predicator["function"] != "and":
-                                    for item in range(0, len(predicator["args"])):
-                                        if predicator["args"][item] == old_argument[items]:
-                                            predicator["args"][item] = new_argument[items]
-                                query_list[quet] = convert_to_string(predicator)
-                    if bool_val:
-                        for mld in range(0,len(predicate["args"])):
-                            if predicate["args"][mld][0].islower():
-                                predicate["args"][mld] = args_dict[predicate["args"][mld]]
-                        query_print = "True: "
-                        print_output(output_file, query_print, convert_to_string(predicate))
-                        break
-            if not bool_val:
-                query_print = "False: "
-                print_output(output_file, query_print, convert_to_string(predicate))
-                break
-    return bool_val, old_argument, new_argument, args_dict
+    #Create a list of clauses
+    n = 1
+    KB = []
+    while n <= int(numberOfClauses):
+        sentence = myFile.readline().strip('\n')
+        KB.append(stringToExpression(sentence))
+        n = n + 1
+    return (KB, query)
 
 
-def swap_arguments(temp_query, pred_clause, predicate):
-    for que in range(0, len(temp_query)):
-        temp = convert_to_dict(temp_query[que])
-        if temp["function"] != "and":
-            for o in range(0, len(pred_clause["args"])):
-                for m in range(0, len(temp["args"])):
-                    if pred_clause["args"][o] == temp["args"][m]:
-                        if temp["args"][m][0].islower():
-                            temp["args"][m] = predicate["args"][o]
-        temp_query[que] = convert_to_string(temp)
-    return temp_query
+class Expression(object):
+    def __init__(self, op, args=[], printed=False):
+        self.op= op
+        self.args = args
+        self.printed = printed
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        elif isinstance(other, Expression):
+            return (self.op == other.op and self.args == other.args)
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.op) ^ hash(tuple(self.args))
+
+    def getStringRepresentation(self, fuzz=False):
+        if(self.isVariable()):
+            return "_"
+        elif(self.isConstant()):
+            return self.op
+        else:
+            argStrings = []
+            for arg in self.args:
+                argString = arg.getStringRepresentation()
+                argStrings.append(argString)
+
+            if self.isAnd():
+                return " && ".join(argStrings)
+            elif self.isImplication():
+                return " => ".join(argStrings)
+            else:
+                return str(self.op) + "(" + ", ".join(argStrings) + ")"
+
+    def getOperator(self):
+        return self.op
+
+    def getArg(self):
+        for i in range(len(self.args)):
+            print i
+
+    def isConstant(self):
+        return (not self.args and self.op[0].isupper())
+
+    def isVariable(self):
+        return (not self.args and self.op[0].islower())
 
 
-def convert_arguments(predicate):
-    for i in range(0, len(predicate["args"])):
-        if predicate["args"][i][0].islower():
-            predicate["args"][i] = "x" + str(i)
-    return predicate
+    def isPredicate(self):
+        if self.args and self.op:
+            return True
+        else:
+            return False
+
+    def isAnd(self):
+        return self.op == "&&"
+
+    def isImplication(self):
+        return self.op == "=>"
+
+    def isPrint(self):
+        return self.op == "print"
 
 
-def backward_chaining(query, clauses, output_file):
-    query_list = convert_to_list(query)
-    clause_list = []
-    args_dict = {
-        "args": []
-    }
-    for clause in clauses:
-        clause_list.append(convert_to_list(clause))
-    bool_value, blah1, blah2, blah3 = find_query(query_list, clause_list, output_file, args_dict)
-    if bool_value:
-        print_output(output_file, "True", " ")
+def standardizeApart(sentence, d):
+    if(sentence.isVariable()):
+        global index
+        key = sentence.op
+        if key not in d:
+            index += 1
+            d[sentence.op] = sentence.op + str(index)
+        return Expression(d[sentence.op])
+    elif(sentence.isConstant()):
+        return Expression(sentence.op)
     else:
-        print_output(output_file, "False", " ")
+        standardizedArgs = []
+        for arg in sentence.args:
+            standardizedArg = standardizeApart(arg, d)
+            standardizedArgs.append(standardizedArg)
+        return Expression(sentence.op, standardizedArgs)
 
+def stringToExpression(sentence):
+    implicationOpArgs = sentence.split(" => ")
+    andOperatorArgs = sentence.split(" && ")
+    if (len(implicationOpArgs) > 1):
+        lhsExp = stringToExpression(implicationOpArgs[0])
+        rhsExp = stringToExpression(implicationOpArgs[1])
 
-def convert_to_dict(predicate):
-    pred = {}
-    k = predicate.find("(")
-    if k != -1:
-        func = predicate[:k]
-        l = predicate.index(")")
-        args = predicate[k+1:l]
-        list_arg = args.split(", ")
+        return Expression("=>", [lhsExp, rhsExp])
+    elif (len(andOperatorArgs) > 1):
+        #Multiple predicates
+        op = "&&"
+        args = []
+        for andOperatorArg in andOperatorArgs:
+            arg = stringToExpression(andOperatorArg)
+            args.append(arg)
 
-        pred["function"] = func
-        pred["args"] = list_arg
+        return Expression(op, args)
     else:
-        pred["function"] = "and"
-    return pred
+        #Single predicate, constant or variable
+        temp = andOperatorArgs[0]
+        tempParts = temp.split('(')
+        op = tempParts[0]
+        if len(tempParts) > 1:
+            tempParts = tempParts[1].split(')')
+            argsString = tempParts[0]
+        else:
+            argsString = None
+
+        args = []
+        if argsString:
+            argStrings = argsString.split(', ')
+            for argString in argStrings:
+                arg = stringToExpression(argString)
+                args.append(arg)
+
+        return Expression(op, args)
 
 
-def convert_to_string(predicate):
-    if predicate["function"] != "and":
-        str_pred = predicate["function"] + "("
-        str_pred += ", ".join(predicate["args"])
-        str_pred += ")"
+def unify(p, q, theta):
+    if theta is None:
+        return None
+    elif(p == q):
+        return theta
+    elif(p.isVariable()):
+        return unifyVar(p, q, theta)
+    elif(q.isVariable()):
+        return unifyVar(q, p, theta)
+    elif(p.isPredicate() and q.isPredicate):
+        if p.op == q.op:
+            if(len(p.args) != len(q.args)):
+                return None
+            for i in range(len(p.args)):
+                theta = unify(p.args[i], q.args[i], theta)
+            return theta
+        elif p.isImplication():
+            return unify(p.args[1], q, theta)
+        elif q.isImplication():
+            return unify(p, q.args[1], theta)
+        else:
+            return None
     else:
-        str_pred = "&&"
-    return str_pred
+        return None
 
 
-def convert_to_list(claused):
-    clause_list = []
-    i = claused.index(")")
-    if i == len(claused)-1:
-        clause_list.append(claused)
+def unifyVar(var, x, theta):
+    if var in theta:
+        return unify(theta[var], x, theta)
+    elif x in theta:
+        return unify(var, theta[x], theta)
+    elif occurCheck(var, x):
+        return None
     else:
-        temp_clause = claused[:i+1]
-        clause_list.append(temp_clause)
-        temp_2_clause = list(claused[i+2:])
-        for i in range(0, len(temp_2_clause)):
-            if temp_2_clause[i] == ',':
-                temp_2_clause[i+1] = '+'
-        temp_2_clause = "".join(temp_2_clause)
-        temp_2_list = temp_2_clause.split(" ")
-        for wal in range(0, len(temp_2_list)):
-            while temp_2_list[wal].find("+") != -1:
-                pos = temp_2_list[wal].find("+")
-                m = list(temp_2_list[wal])
-                m[pos] = " "
-                m = "".join(m)
-                temp_2_list[wal] = m
-            clause_list.append(temp_2_list[wal])
-    return clause_list
+        theta[var] = x
+        return theta
 
 
-def print_output(filename, val, qval):
-    if qval != " ":
-        qpred = convert_to_dict(qval)
-        predq =deepcopy(qpred)
-        for i in range(0, len(predq["args"])):
-            if predq["args"][i][0].islower():
-                predq["args"][i] = "_"
-        val_to_print = val + convert_to_string(predq)
-        filename.write(val_to_print + "\n")
+def occurCheck(p, q):
+    if(p == q):
+        return True
+    elif isinstance(q, list):
+        for item in q:
+            if occurCheck(p, item):
+                return True
+        return False
     else:
-        filename.write(val + "\n")
+        return occurCheck(p, q.args)
 
+def substitute(theta, p):
+    if p.isPredicate():
+        substitutedArgs = []
+        for arg in p.args:
+            substitutedArgs.append(substitute(theta, arg))
+        return Expression(p.op, substitutedArgs)
+    elif p.isConstant():
+        return p
+    else:
+        if p in theta:
+            if theta[p].isVariable():
+                return substitute(theta, theta[p])
+            else:
+                return theta[p]
+        else:
+            return p
+
+def compose(thetaA, thetaB):
+    thetaC = dict()
+    thetaC.update(thetaA)
+    thetaC.update(thetaB)
+    return thetaC
+def backwardChaining(KB, goals, theta):
+    if not goals:
+        return theta
+    firstGoal = goals[0]
+    if firstGoal.isPrint():
+        firstGoal.args[0].printed = True
+        outputFile.write("True: "+(substitute(theta, firstGoal.args[0])).getStringRepresentation()+'\n')
+        return backwardChaining(KB, goals[1:], theta)
+    elif firstGoal.isAnd():
+        expandedGoals = []
+        expandedGoals.extend(firstGoal.args)
+        expandedGoals.extend(goals[1:])
+        return backwardChaining(KB, expandedGoals, theta)
+    qPrime = substitute(theta, firstGoal)
+    outputFile.write("Ask: "+qPrime.getStringRepresentation()+'\n')
+    firstSearch = True
+    for clause in KB:
+        r = standardizeApart(clause, {})
+        thetaPrime = deepcopy(theta)
+        thetaPrime = unify(r, qPrime, thetaPrime)
+
+        if thetaPrime is not None:
+            if not firstSearch:
+                outputFile.write("Ask: "+qPrime.getStringRepresentation()+'\n')
+            firstSearch = False
+            if not r.isImplication():
+                qPrime.printed = True
+                outputFile.write("True: " +(substitute(thetaPrime, qPrime)).getStringRepresentation()+'\n')
+            newGoals = []
+            if r.isImplication():
+                newGoals.append(r.args[0])
+                newGoals.append(Expression("print", [qPrime]))
+            newGoals.extend(goals[1:])
+            thetaPrime = backwardChaining(KB, newGoals, compose(theta, thetaPrime))
+            if thetaPrime is not None:
+                return thetaPrime
+
+    if not qPrime.printed:
+        outputFile.write("False: "+qPrime.getStringRepresentation()+'\n')
+    return None
 
 def main():
-    #input_file = open(sys.argv[2], "r")
-    input_file = open("input.txt", "r")
-    query, clauses = read_file(input_file)
-    input_file.close()
-    output_file = open("output.txt", "w")
-    backward_chaining(query, clauses, output_file)
-    output_file.close()
+    inputFile = "input.txt";
+    (KB, query) = parseInputFile(inputFile)
+    theta = {}
+
+    if query.isAnd():
+        for arg in query.args:
+            theta = backwardChaining(KB, [arg], theta)
+            breakOut = theta is None
+            if breakOut:
+                outputFile.write(str(False))
+                break
+        if not breakOut:
+            outputFile.write(str(True))
+    else:
+        theta = backwardChaining(KB, [query], theta)
+        if(theta is not None):
+            value = True
+        else:
+            value = False
+        outputFile.write(str(value))
+
+    outputFile.close()
+
+if __name__ == '__main__':
+    main()
 
 
-main()
